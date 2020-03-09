@@ -87,7 +87,7 @@ enetCV = function (X, y, alpha, lambda, folds, progressBar, family,
 
     fit <- ssenet::enet(xtrain=xtrain, ytrain=ytrain, alpha = alpha, lambda = lambda,
       family = family, xtest = xtest, ytest = ytest, filter = filter,
-      topranked = topranked, keepVar = keepVar, weights = weights)
+      topranked = topranked, keepVar = keepVar, weights = weights[-omit])
     probs[[i]] <- fit$probs
     predictResponseList[[i]] <- fit$predictResponse
     enet.panel[[i]] <- fit$enet.panel
