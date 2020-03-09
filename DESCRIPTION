@@ -1,0 +1,26 @@
+Package: ssenet
+Type: Package
+Title: Semi-supervised implementation of glmnet
+Version: 0.1.0
+Author: Amrit Singh
+Maintainer: Amrit Singh <asingh.analytics@gmail.com>
+Description: Used to analyse the Cortex seq-FISH data as part of the BIRSBiointegration workshops. 
+    Mathematical Frameworks for Integrative Analysis of Emerging Biological Data Type June 14- 19, 2020 in Banff, Canada.
+License: MIT
+Depends: 
+    R (>= 3.6)
+Imports: 
+    glmnet (>= 2.0-18),
+    limma (>= 3.40.6),
+    pROC (>= 1.15.3),
+    OptimalCutpoints (>= 1.1-4),
+    caret (>= 6.0-84),
+    parallel (>= 3.6.1),
+    magrittr (>= 1.5),
+    tidyr (>= 0.8.3),
+    dplyr (>= 0.8.3)
+Suggests: testthat,
+    assertthat
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 7.0.2
