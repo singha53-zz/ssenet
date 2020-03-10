@@ -12,6 +12,10 @@ predict.ssenet = function (object, validation = c("Mfold", "loo"), M = 5, iter =
   ncores = 4, progressBar = TRUE) {
   X <- object$xtrain
   y <- object$ytrain
+  Xlabeled <- X[!is.na(y), ]
+  ylabeled <- y[!is.na(y)]
+  Xunlabeled <- X[is.na(y), ]
+  yunlabeled <- y[is.na(y)]
   n <- nrow(X)
   alpha <- object$alpha
   family <- object$family
@@ -24,31 +28,27 @@ predict.ssenet = function (object, validation = c("Mfold", "loo"), M = 5, iter =
   perc.full <- object$perc.full
   thr.conf <- object$thr.conf
   if (validation == "Mfold") {
-    folds <- lapply(1:iter, function(i) caret::createFolds(y, k = M))
+    folds <- lapply(1:iter, function(i) caret::createFolds(ylabeled, k = M))
     cl <- parallel::makeCluster(mc <- getOption("cl.cores", ncores))
     parallel::clusterCall(cl, function() library("ssenet"))
-    parallel::clusterExport(cl, varlist = c("X", "y", "alpha", "lambda", "folds", "progressBar",
+    parallel::clusterExport(cl, varlist = c("Xlabeled", "Xunlabeled", "ylabeled", "yunlabeled", "alpha", "lambda", "folds", "progressBar",
       "family", "filter", "topranked", "keepVar", "useObsWeights"), envir = environment())
     cv <- parallel::parLapply(cl, folds, function(foldsi,
-      X, y, alpha, lambda, progressBar, family, filter,
+      Xlabeled, Xunlabeled, ylabeled, yunlabeled, alpha, lambda, progressBar, family, filter,
       topranked, keepVar, useObsWeights, max.iter, perc.full, thr.conf) {
-      ssenet::ssenetCV(X = X, y = y, alpha = alpha, lambda = lambda,
+      ssenet::ssenetCV(Xlabeled = Xlabeled, Xunlabeled = Xunlabeled, ylabeled =ylabeled, yunlabeled = yunlabeled, alpha = alpha, lambda = lambda,
         folds = foldsi, progressBar = progressBar,
         family = family, filter = filter, topranked = topranked,
         keepVar=keepVar, useObsWeights = useObsWeights,
         max.iter = max.iter, perc.full = perc.full, thr.conf = thr.conf)
-    }, X, y, alpha, lambda, progressBar, family, filter,
+    }, Xlabeled, Xunlabeled, ylabeled, yunlabeled, alpha, lambda, progressBar, family, filter,
       topranked, keepVar, useObsWeights, max.iter, perc.full, thr.conf) %>% ssenet::zip_nPure()
     parallel::stopCluster(cl)
     perf <- do.call(rbind, cv$perf) %>% as.data.frame %>%
       tidyr::gather(ErrName, Err) %>% dplyr::group_by(ErrName) %>%
       dplyr::summarise(Mean = mean(Err), SD = sd(Err))
   } else {
-    folds = split(1:n, rep(1:n, length = n))
-    cv <- ssenet::enetCV(X, y, alpha, lambda, folds, progressBar,
-      family, filter, topranked, keepVar, useObsWeights, max.iter, perc.full, thr.conf)
-    perf <- data.frame(Mean = cv$perf) %>% mutate(ErrName = rownames(.))
-    perf$SD <- NA
+    stop("The validation argument must be set to Mfold!")
   }
   result = list()
   result$folds = folds
@@ -74,7 +74,7 @@ predict.ssenet = function (object, validation = c("Mfold", "loo"), M = 5, iter =
 #' @param keepVar - names of specific variable to keep in model
 #' @param weights - observational weights; default to 1
 #' @export
-ssenetCV = function (X, y, alpha, lambda, folds, progressBar, family,
+ssenetCV = function(Xlabeled, Xunlabeled, ylabeled, yunlabeled, alpha, lambda, folds, progressBar, family,
   filter, topranked, keepVar, useObsWeights, max.iter, perc.full, thr.conf) {
   M <- length(folds)
   probs <- predictResponseList <- enet.panel <- list()
@@ -84,10 +84,10 @@ ssenetCV = function (X, y, alpha, lambda, folds, progressBar, family,
     if (progressBar == TRUE)
       setTxtProgressBar(pb, i/M)
     omit = folds[[i]]
-    xtrain = X[-omit, , drop = FALSE]
-    ytrain = y[-omit]
-    xtest <- X[omit, , drop = FALSE]
-    ytest = y[omit]
+    xtrain = rbind(Xlabeled[-omit, , drop = FALSE], Xunlabeled)
+    ytrain = factor(c(as.character(ylabeled[-omit]), yunlabeled), levels(ylabeled))
+    xtest <- Xlabeled[omit, , drop = FALSE]
+    ytest = ylabeled[omit]
 
     fit <- ssenet::ssenet(xtrain=xtrain, ytrain=ytrain, alpha = alpha, lambda = lambda,
       family = family, xtest = xtest, ytest = ytest, filter = filter,
@@ -100,12 +100,12 @@ ssenetCV = function (X, y, alpha, lambda, folds, progressBar, family,
   predictResponse <- unlist(predictResponseList)
   if (family == "binomial") {
     probs <- unlist(probs)
-    trueLabels = y[unlist(folds)]
+    trueLabels = ylabeled[unlist(folds)]
     perf <- ssenet::tperformance(weights = probs, trueLabels = trueLabels)
   }else {
-    trueLabels = y[unlist(folds)]
-    mat <- table(factor(trueLabels, levels(y)), factor(predictResponse,
-      levels(y)))
+    trueLabels = ylabeled[unlist(folds)]
+    mat <- table(factor(predictResponse,
+      levels(ylabeled)), factor(trueLabels, levels(ylabeled)))
     mat2 <- mat
     diag(mat2) <- 0
     classError <- colSums(mat2)/colSums(mat)
