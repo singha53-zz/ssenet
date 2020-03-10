@@ -88,3 +88,57 @@ selectInstances <- function(cantClass, probabilities){
   r <- data.frame(class.idx = class.idx, unlabeled.idx = unlabeled.idx, prob.cls = prob.cls)
   return(r)
 }
+
+#' @export
+customTheme = function (sizeStripFont, xAngle, hjust, vjust, xSize, ySize,
+  xAxisSize, yAxisSize) {
+  theme(strip.background = element_rect(colour = "black", fill = "white",
+    size = 1), strip.text.x = element_text(size = sizeStripFont),
+    strip.text.y = element_text(size = sizeStripFont), axis.text.x = element_text(angle = xAngle,
+      hjust = hjust, vjust = vjust, size = xSize, color = "black"),
+    axis.text.y = element_text(size = ySize, color = "black"),
+    axis.title.x = element_text(size = xAxisSize, color = "black"),
+    axis.title.y = element_text(size = yAxisSize, color = "black"),
+    panel.background = element_rect(fill = "white", color = "black"))
+}
+
+#' @export
+zip_nPure = function (.x, .fields = NULL, .simplify = FALSE) {
+  if (length(.x) == 0)
+    return(list())
+  if (is.null(.fields)) {
+    if (is.null(names(.x[[1]]))) {
+      .fields <- seq_along(.x[[1]])
+    }
+    else {
+      .fields <- stats::setNames(names(.x[[1]]), names(.x[[1]]))
+    }
+  }
+  else {
+    if (is.character(.fields) && is.null(names(.fields))) {
+      names(.fields) <- .fields
+    }
+  }
+  out <- lapply(.fields, function(i) lapply(.x, .subset2, i))
+  if (.simplify)
+    out <- lapply(out, simplify_if_possible)
+  out
+}
+
+#' @export
+tperformance = function (weights, trueLabels)
+{
+  df = data.frame(prob = as.numeric(weights), status = model.matrix(~factor(as.character(trueLabels),
+    levels = levels(trueLabels)))[, 2])
+  roc.score = roc(response = df$status, predictor = weights,
+    plot = FALSE, percent = TRUE, na.rm = TRUE, direction = "<")
+  optimal.cutpoint.Youden <- optimal.cutpoints(X = "prob",
+    status = "status", tag.healthy = 0, methods = "Youden",
+    data = df, control = control.cutpoints(), ci.fit = FALSE,
+    conf.level = 0.95, trace = FALSE, pop.prev = 0.5)
+  optimalValues <- round(c(summary(optimal.cutpoint.Youden)$p.table$Global$Youden[[1]][1:5,
+    ], roc.score$auc/100), 3)
+  names(optimalValues) <- c(names(optimalValues)[-length(names(optimalValues))],
+    "AUC")
+  optimalValues
+}
