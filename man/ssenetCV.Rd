@@ -5,8 +5,10 @@
 \title{M-fold cross-validation function for all methods}
 \usage{
 ssenetCV(
-  X,
-  y,
+  Xlabeled,
+  Xunlabeled,
+  ylabeled,
+  yunlabeled,
   alpha,
   lambda,
   folds,
@@ -22,10 +24,6 @@ ssenetCV(
 )
 }
 \arguments{
-\item{X}{nxp matrix - training dataset}
-
-\item{y}{factor - response variable}
-
 \item{alpha}{= 1 (lasso), alpha = 0 (ridge), 0 < alpha < 1 (elastic net penalty)}
 
 \item{lambda}{= strength of elastic net penalty}
@@ -41,6 +39,10 @@ ssenetCV(
 \item{topranked}{= 50 (top number of features to select and build a classifier)}
 
 \item{keepVar}{- names of specific variable to keep in model}
+
+\item{X}{nxp matrix - training dataset}
+
+\item{y}{factor - response variable}
 
 \item{weights}{- observational weights; default to 1}
 }
