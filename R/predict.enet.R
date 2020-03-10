@@ -99,8 +99,8 @@ enetCV = function (X, y, alpha, lambda, folds, progressBar, family,
     perf <- ssenet::tperformance(weights = probs, trueLabels = trueLabels)
   }else {
     trueLabels = y[unlist(folds)]
-    mat <- table(factor(trueLabels, levels(y)), factor(predictResponse,
-      levels(y)))
+    mat <- table(factor(predictResponse,
+      levels(y)), factor(trueLabels, levels(y)))
     mat2 <- mat
     diag(mat2) <- 0
     classError <- colSums(mat2)/colSums(mat)
