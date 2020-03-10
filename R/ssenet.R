@@ -21,6 +21,14 @@ ssenet = function (xtrain, ytrain, alpha, lambda = NULL, family, xtest = NULL,
     weights <- rep(1, length(ytrain))
   }
 
+  # lambda is preset, since cv.glmnet doesnt work if sample size in the individual classes is too low.
+  if (is.null(lambda)) {
+    lambda = 0.01
+    print("No lambda value provided; using a lambda value of 0.01")
+  } else {
+    lambda = lambda
+  }
+
   # Pre-filtering xtrain (none, pvalue, or top features)
   if (filter == "none") {
     x1train <- xtrain
@@ -54,12 +62,6 @@ ssenet = function (xtrain, ytrain, alpha, lambda = NULL, family, xtest = NULL,
   if (family == "binomial") {
     fit <- glmnet::glmnet(x2train, ytrainImputed$pred, family = "binomial", alpha = alpha,
       penalty.factor = penalty.factor, weights = ytrainImputed$weights)
-    if (is.null(lambda)) {
-      cv.fit <- glmnet::cv.glmnet(x2train, ytrainImputed$pred, family = "binomial", weights = ytrainImputed$weights)
-      lambda = cv.fit$lambda.min
-    } else {
-      lambda = lambda
-    }
     Coefficients <- coef(fit, s = lambda)
     Active.Index <- which(Coefficients[, 1] != 0)
     Active.Coefficients <- Coefficients[Active.Index, ]
@@ -71,12 +73,6 @@ ssenet = function (xtrain, ytrain, alpha, lambda = NULL, family, xtest = NULL,
   if (family == "multinomial") {
     fit <- glmnet::glmnet(x2train, ytrainImputed$pred, family = "multinomial", alpha = alpha,
       type.multinomial = "grouped", penalty.factor = penalty.factor, weights = ytrainImputed$weights)
-    if (is.null(lambda)) {
-      cv.fit <- glmnet::cv.glmnet(x2train, ytrainImputed$pred, family = "multinomial", weights = ytrainImputed$weights)
-      lambda = cv.fit$lambda.min
-    } else {
-      lambda = lambda
-    }
     Coefficients <- coef(fit, s = lambda)
     Active.Index <- which(Coefficients[[1]][, 1] != 0)
     Active.Coefficients <- Coefficients[[1]][Active.Index,]
@@ -166,7 +162,7 @@ imputeLabels = function(x, y, alpha, lambda, family, max.iter = 100, perc.full =
         lambda = lambda
       }
       # Predict probabilities per classes of unlabeled examples
-      prob <- checkProb(prob = glmnet::predict(model, x[unlabeled, ], s = lambda, type = "response")[,,1], ninstances = length(unlabeled), classes)
+      prob <- checkProb(prob = glmnet::predict.lognet(model, x[unlabeled, ], s = lambda, type = "response")[,,1], ninstances = length(unlabeled), classes)
     }
     if(family == "multinomial"){
       model <- glmnet::glmnet(x[labeled, ], ynew[labeled], family=family, alpha = alpha, type.multinomial = "grouped", weights = weights)
