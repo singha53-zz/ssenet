@@ -12,7 +12,9 @@ output:
 
 
 
-# Zhu *et al* 2018: [seqFISH paper](https://www.nature.com/articles/nbt.4260)
+# Analysis for the Abstract Submission to #BIRSBioIntegration [Mathematical Frameworks for Integrative Analysis of Emerging Biological Data Types](https://www.birs.ca/events/2020/5-day-workshops/20w5197)
+
+## Zhu *et al* 2018: [seqFISH paper](https://www.nature.com/articles/nbt.4260)
   * 43 genes (Supplementary Table 2) to map cell types in the seqFISH data:
 
 ### Step 1: mapping scRNASeq celltypes on seqFISH data
@@ -62,18 +64,191 @@ points(coord, col = mixOmics::color.mixo(as.numeric(seqfishLabels$V3)), pch = 19
 ## 2) What is the minimal number of genes needed for data integration?
 ## 3) Are there signatures of cellular co-localization or spatial coordinates in non-spatial scRNA-seq data?
 
-## Questions 1 and 2:
-
 ## Apply Enet to scRNAseq data and apply to seqFISH to determine cell-type labels
 
 
 ```r
-fitEnet <- enet(xtrain=t(scrnaseq), ytrain=scrnaseqLabels$V1, alpha = 1, lambda = 0.01, family = "multinomial", 
-  xtest = t(seqfish), ytest = seqfishLabels$V3, filter = "none", topranked = 50, keepVar = NULL, weights = NULL)
-cvEnet <- predict(object = fitEnet, validation="Mfold", M = 5, iter = 5, ncores = 5, progressBar = TRUE)
+indices1 <- lapply(levels(scrnaseqLabels$V1), function(i){
+  which(as.character(scrnaseqLabels$V1) == i)[1:6]
+}) %>% unlist()
+indices2 <- lapply(levels(seqfishLabels$V3), function(i){
+  which(as.character(seqfishLabels$V3) == i)[1:8]
+}) %>% unlist()
+
+
+fitEnet <- enet(xtrain=t(scrnaseq[, indices1]), ytrain=scrnaseqLabels$V1[indices1], alpha = 1, lambda = NULL, family = "multinomial", 
+  xtest = t(seqfish[, indices2]), ytest = seqfishLabels$V3[indices2], filter = "none", topranked = 50, keepVar = NULL, weights = NULL)
+cvEnet <- predict(object = fitEnet, validation="Mfold", M = 2, iter = 2, ncores = 2, progressBar = TRUE)
+cvEnet$perf
 ```
 
+```
+## # A tibble: 10 x 3
+##    ErrName                Mean     SD
+##    <chr>                 <dbl>  <dbl>
+##  1 Astrocyte            0      0     
+##  2 BER                  0.240  0.0442
+##  3 Endothelial Cell     0.417  0.354 
+##  4 ER                   0.240  0.0442
+##  5 GABA-ergic Neuron    0.25   0.118 
+##  6 Glutamatergic Neuron 0.0833 0.118 
+##  7 Microglia            0.0833 0.118 
+##  8 Oligodendrocyte.1    0.5    0.236 
+##  9 Oligodendrocyte.2    0.5    0.471 
+## 10 Oligodendrocyte.3    0.0833 0.118
+```
 
+## Apply Semi-supervised Enet to scRNAseq+seqFISH data to determine cell-type labels
+
+
+```r
+fitSSEnet <- ssenet(xtrain=t(cbind(scrnaseq[,indices1], seqfish[, indices2])), ytrain=factor(c(as.character(scrnaseqLabels$V1[indices1]), rep(NA, ncol(seqfish))[indices2])), 
+  alpha = 1, lambda = fitEnet$lambda, family = "multinomial", 
+  xtest = t(seqfish[, indices2]), ytest = seqfishLabels$V3[indices2], filter = "none", topranked = 50, keepVar = NULL, 
+  useObsWeights = FALSE, max.iter = 100, perc.full = 1, thr.conf = 0.5)
+cvSSEnet <- predict(object = fitSSEnet, validation="Mfold", M = 2, iter = 2, ncores = 2, progressBar = TRUE)
+cvSSEnet$perf
+```
+
+```
+## # A tibble: 10 x 3
+##    ErrName                Mean     SD
+##    <chr>                 <dbl>  <dbl>
+##  1 Astrocyte            0.0833 0.118 
+##  2 BER                  0.292  0.0589
+##  3 Endothelial Cell     0.25   0.354 
+##  4 ER                   0.292  0.0589
+##  5 GABA-ergic Neuron    0.333  0.236 
+##  6 Glutamatergic Neuron 0.167  0.236 
+##  7 Microglia            0.25   0.354 
+##  8 Oligodendrocyte.1    0.667  0     
+##  9 Oligodendrocyte.2    0.417  0.354 
+## 10 Oligodendrocyte.3    0.167  0
+```
+
+## Compare supervised and semi-supervised Enet (Enet and SSEnet) predicted seqFISH cell-types labels with those estimated via the multiclass SVM used in the paper.
+
+
+```r
+data.frame(err = c(fitEnet$perfTest, fitSSEnet$perfTest),
+  errName = factor(rep(names(fitEnet$perfTest), 2), names(fitEnet$perfTest)),
+  type = rep(c("Enet", "SSEnet"), each = length(fitEnet$perfTest))) %>% 
+  ggplot(aes(x = errName, y = err, fill = type)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  customTheme(sizeStripFont = 15, xAngle = 40, hjust = 1, vjust = 1, 
+    xSize = 10, ySize = 10, xAxisSize = 15, yAxisSize = 15) +
+  ylab("Error") +
+  xlab("Cell-type, ER (error rate), BER (balanced error rate)")
+```
+
+![](README_files/figure-html/unnamed-chunk-4-1.png)<!-- -->
+
+> SSEnet predicted cell-type labels have less correspondence with the multiclass SVM predict cell-types labels as compared to Enet only. The major cell-types GABA-ergic Neuron and Glutamatergic Neuron have lower error rates than the other cell-types both both Enet and SSEnet.
+
+## Compare supervised and semi-supervised Enet (Enet and SSEnet) performance using cross-validation
+
+
+```r
+cvErr <- rbind(cvEnet$perf, cvSSEnet$perf) %>% 
+  mutate(method = rep(c("Enet", "SSEnet"), each = nrow(cvEnet$perf))) %>% 
+  mutate(ErrName = factor(ErrName, names(fitEnet$perfTest)))
+pd <- position_dodge(0.5)
+cvErr %>% 
+  ggplot(aes(x = ErrName, y = Mean, color = method)) +
+  geom_errorbar(aes(ymin=Mean-SD, ymax=Mean+SD), width=.2, position=pd) +
+  geom_line(position=pd) +
+  geom_point(position=pd, size = 3) +
+  theme_bw() +
+  ylab("Average error rate (2x2 cross-validation)") +
+  xlab("Cell-type, ER (error rate), BER (balanced error rate)") +
+  customTheme(sizeStripFont = 15, xAngle = 40, hjust = 1, vjust = 1, 
+    xSize = 10, ySize = 10, xAxisSize = 15, yAxisSize = 15) +
+  ylab("Error") +
+  xlab("Cell-type, ER (error rate), BER (balanced error rate)")
+```
+
+![](README_files/figure-html/unnamed-chunk-5-1.png)<!-- -->
+
+
+
+ErrName                      Mean          SD  method 
+---------------------  ----------  ----------  -------
+Astrocyte               0.0000000   0.0000000  Enet   
+BER                     0.2395833   0.0441942  Enet   
+Endothelial Cell        0.4166667   0.3535534  Enet   
+ER                      0.2395833   0.0441942  Enet   
+GABA-ergic Neuron       0.2500000   0.1178511  Enet   
+Glutamatergic Neuron    0.0833333   0.1178511  Enet   
+Microglia               0.0833333   0.1178511  Enet   
+Oligodendrocyte.1       0.5000000   0.2357023  Enet   
+Oligodendrocyte.2       0.5000000   0.4714045  Enet   
+Oligodendrocyte.3       0.0833333   0.1178511  Enet   
+Astrocyte               0.0833333   0.1178511  SSEnet 
+BER                     0.2916667   0.0589256  SSEnet 
+Endothelial Cell        0.2500000   0.3535534  SSEnet 
+ER                      0.2916667   0.0589256  SSEnet 
+GABA-ergic Neuron       0.3333333   0.2357023  SSEnet 
+Glutamatergic Neuron    0.1666667   0.2357023  SSEnet 
+Microglia               0.2500000   0.3535534  SSEnet 
+Oligodendrocyte.1       0.6666667   0.0000000  SSEnet 
+Oligodendrocyte.2       0.4166667   0.3535534  SSEnet 
+Oligodendrocyte.3       0.1666667   0.0000000  SSEnet 
+
+
+
+> The semi-supervised approach performs slightly better for the lower abundant cell-types. 
+
+
+## Abstract
+
+### Your Name
+> Amrit Singh
+
+### Slack name on #BIRSBioIntegration
+> Amrit Singh
+
+### Your Position
+> trainee (post-doc)
+
+### Name of supervisor
+> Kim-Anh Le Cao/Bruce McManus
+
+### Affiliation
+> PROOF Centre of Excellence and The University of British Columbia
+
+### Email
+> asingh@hli.ubc.ca
+
+### Co-authors
+> none
+
+### Which dataset(s) did you select for analysis?
+> Spatial transcriptomics: seqFISH + scRNA-seq
+
+### Why did you select this dataset(s) for analysis
+> recommended by supervisor
+
+### What integrative data analysis question have you addressed with the selected data and why?
+> Can scRNA-seq data be overlaid onto seqFISH for resolution enhancement?
+
+What are the advantages and performance of your approach?
+> The published approach trained a multiclass SVM on the scRNAseq data and applied it to the seqFISH data to estimate the cell-types labels. My approach uses a penalized regression method (glmnet) with a semi-supervised appraoch in order to build a model using both the scRNAseq+seqFISH data. This strategy uses a recursive approach that invovles multiple rounds of training glmnet models using labeled data (scRNAseq) and predicting the cell-type labels of unlabeled data (seqFISH). At each iteration, samples with high confidence (probability > 0.5) of belonging to a particular cell-type are retained for the next iteration, whereas a new glmnet model is trained with the scRNAseq data and seqFISH data with imputed cell-type labels with high confidence. This process is repeated until all cell-types in the seqFISH data have been labels or 50 iterations (in order to reduce compute times).
+  The advantage of this approach is that more data in used for model training such that the result model may generalize better to new data. The performance of this appraoch was estimated using cross-validation, using only the scRNAseq data as the test set.
+
+### What were the specific challenges you have encountered so far?
+> Compute time is significantly longer for the semi-supervised approach for model training. Cross-validation takes even longer. The datasets are restricted to 113 genes and therefore the discovery space is very limited for the semi-supervised approach to learn 
+
+### How are you going to address those challenges?
+> Cross-validation was paralellized such that each iteration of cross-validation was run on an independent cpu thread. If the additional data is available for this study it may be better than the current results given that the genes are limited to those identified using the scRNAseq data only.
+
+### Link to your preliminary code and results on a Github account (optional)
+> https://github.com/singha53/ssenet
+
+### Additional information you would like the organizers to know
+> This is my first time looking at single cell data and this opportunity would expose me to knew methods, technologies and research in this field.
+
+## References
+1) https://github.com/mabelc/SSC
 
 
 # [Data files](https://github.com/BIRSBiointegration/Hackathon/tree/master/seqFISH)
