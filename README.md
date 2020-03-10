@@ -82,10 +82,20 @@ points(coord, col = mixOmics::color.mixo(as.numeric(seqfishLabels$V3)), pch = 19
 
 ``` r
 indices1 <- lapply(levels(scrnaseqLabels$V1), function(i){
-  which(as.character(scrnaseqLabels$V1) == i)[1:6]
+  comp <- which(as.character(scrnaseqLabels$V1) == i)
+  if(length(comp) > 100){
+    comp[1:100]
+  } else {
+    comp
+  }
 }) %>% unlist()
 indices2 <- lapply(levels(seqfishLabels$V3), function(i){
-  which(as.character(seqfishLabels$V3) == i)[1:8]
+  comp <- which(as.character(seqfishLabels$V3) == i)
+  if(length(comp) > 100){
+    comp[1:100]
+  } else {
+    comp
+  }
 }) %>% unlist()
 
 
@@ -96,18 +106,18 @@ cvEnet$perf
 ```
 
     ## # A tibble: 10 x 3
-    ##    ErrName                Mean     SD
-    ##    <chr>                 <dbl>  <dbl>
-    ##  1 Astrocyte            0      0     
-    ##  2 BER                  0.208  0.0295
-    ##  3 Endothelial Cell     0.25   0.118 
-    ##  4 ER                   0.208  0.0295
-    ##  5 GABA-ergic Neuron    0.25   0.118 
-    ##  6 Glutamatergic Neuron 0      0     
-    ##  7 Microglia            0      0     
-    ##  8 Oligodendrocyte.1    0.5    0     
-    ##  9 Oligodendrocyte.2    0.583  0.354 
-    ## 10 Oligodendrocyte.3    0.0833 0.118
+    ##    ErrName                Mean      SD
+    ##    <chr>                 <dbl>   <dbl>
+    ##  1 Astrocyte            0      0      
+    ##  2 BER                  0.209  0.00758
+    ##  3 Endothelial Cell     0.121  0.0244 
+    ##  4 ER                   0.0957 0.0182 
+    ##  5 GABA-ergic Neuron    0.06   0.0141 
+    ##  6 Glutamatergic Neuron 0.06   0.0566 
+    ##  7 Microglia            0      0      
+    ##  8 Oligodendrocyte.1    0.289  0.112  
+    ##  9 Oligodendrocyte.2    0.917  0.118  
+    ## 10 Oligodendrocyte.3    0.226  0
 
 ## Apply Semi-supervised Enet to scRNAseq+seqFISH data to determine cell-type labels
 
@@ -121,18 +131,18 @@ cvSSEnet$perf
 ```
 
     ## # A tibble: 10 x 3
-    ##    ErrName                Mean     SD
-    ##    <chr>                 <dbl>  <dbl>
-    ##  1 Astrocyte            0.0833 0.118 
-    ##  2 BER                  0.385  0.0147
-    ##  3 Endothelial Cell     0.583  0.118 
-    ##  4 ER                   0.385  0.0147
-    ##  5 GABA-ergic Neuron    0.583  0.118 
-    ##  6 Glutamatergic Neuron 0.25   0.354 
-    ##  7 Microglia            0.167  0.236 
-    ##  8 Oligodendrocyte.1    0.667  0     
-    ##  9 Oligodendrocyte.2    0.667  0     
-    ## 10 Oligodendrocyte.3    0.0833 0.118
+    ##    ErrName                Mean      SD
+    ##    <chr>                 <dbl>   <dbl>
+    ##  1 Astrocyte            0.0465 0.0658 
+    ##  2 BER                  0.203  0.00490
+    ##  3 Endothelial Cell     0.138  0      
+    ##  4 ER                   0.117  0      
+    ##  5 GABA-ergic Neuron    0.135  0.00707
+    ##  6 Glutamatergic Neuron 0.045  0.00707
+    ##  7 Microglia            0.0455 0.0643 
+    ##  8 Oligodendrocyte.1    0.237  0.112  
+    ##  9 Oligodendrocyte.2    0.75   0.118  
+    ## 10 Oligodendrocyte.3    0.226  0.0456
 
 ## Compare supervised and semi-supervised Enet (Enet and SSEnet) predicted seqFISH cell-types labels with those estimated via the multiclass SVM used in the paper.
 
@@ -181,25 +191,25 @@ cvErr %>%
 | ErrName              |      Mean |        SD | method |
 | :------------------- | --------: | --------: | :----- |
 | Astrocyte            | 0.0000000 | 0.0000000 | Enet   |
-| BER                  | 0.2083333 | 0.0294628 | Enet   |
-| Endothelial Cell     | 0.2500000 | 0.1178511 | Enet   |
-| ER                   | 0.2083333 | 0.0294628 | Enet   |
-| GABA-ergic Neuron    | 0.2500000 | 0.1178511 | Enet   |
-| Glutamatergic Neuron | 0.0000000 | 0.0000000 | Enet   |
+| BER                  | 0.2090796 | 0.0075758 | Enet   |
+| Endothelial Cell     | 0.1206897 | 0.0243830 | Enet   |
+| ER                   | 0.0957143 | 0.0181827 | Enet   |
+| GABA-ergic Neuron    | 0.0600000 | 0.0141421 | Enet   |
+| Glutamatergic Neuron | 0.0600000 | 0.0565685 | Enet   |
 | Microglia            | 0.0000000 | 0.0000000 | Enet   |
-| Oligodendrocyte.1    | 0.5000000 | 0.0000000 | Enet   |
-| Oligodendrocyte.2    | 0.5833333 | 0.3535534 | Enet   |
-| Oligodendrocyte.3    | 0.0833333 | 0.1178511 | Enet   |
-| Astrocyte            | 0.0833333 | 0.1178511 | SSEnet |
-| BER                  | 0.3854167 | 0.0147314 | SSEnet |
-| Endothelial Cell     | 0.5833333 | 0.1178511 | SSEnet |
-| ER                   | 0.3854167 | 0.0147314 | SSEnet |
-| GABA-ergic Neuron    | 0.5833333 | 0.1178511 | SSEnet |
-| Glutamatergic Neuron | 0.2500000 | 0.3535534 | SSEnet |
-| Microglia            | 0.1666667 | 0.2357023 | SSEnet |
-| Oligodendrocyte.1    | 0.6666667 | 0.0000000 | SSEnet |
-| Oligodendrocyte.2    | 0.6666667 | 0.0000000 | SSEnet |
-| Oligodendrocyte.3    | 0.0833333 | 0.1178511 | SSEnet |
+| Oligodendrocyte.1    | 0.2894737 | 0.1116484 | Enet   |
+| Oligodendrocyte.2    | 0.9166667 | 0.1178511 | Enet   |
+| Oligodendrocyte.3    | 0.2258065 | 0.0000000 | Enet   |
+| Astrocyte            | 0.0465116 | 0.0657774 | SSEnet |
+| BER                  | 0.2028182 | 0.0048969 | SSEnet |
+| Endothelial Cell     | 0.1379310 | 0.0000000 | SSEnet |
+| ER                   | 0.1171429 | 0.0000000 | SSEnet |
+| GABA-ergic Neuron    | 0.1350000 | 0.0070711 | SSEnet |
+| Glutamatergic Neuron | 0.0450000 | 0.0070711 | SSEnet |
+| Microglia            | 0.0454545 | 0.0642824 | SSEnet |
+| Oligodendrocyte.1    | 0.2368421 | 0.1116484 | SSEnet |
+| Oligodendrocyte.2    | 0.7500000 | 0.1178511 | SSEnet |
+| Oligodendrocyte.3    | 0.2258065 | 0.0456198 | SSEnet |
 
 > The semi-supervised approach performs slightly better for the lower
 > abundant cell-types.

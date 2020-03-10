@@ -66,10 +66,20 @@ points(coord, col = mixOmics::color.mixo(as.numeric(seqfishLabels$V3)), pch = 19
 
 ```{r}
 indices1 <- lapply(levels(scrnaseqLabels$V1), function(i){
-  which(as.character(scrnaseqLabels$V1) == i)[1:6]
+  comp <- which(as.character(scrnaseqLabels$V1) == i)
+  if(length(comp) > 100){
+    comp[1:100]
+  } else {
+    comp
+  }
 }) %>% unlist()
 indices2 <- lapply(levels(seqfishLabels$V3), function(i){
-  which(as.character(seqfishLabels$V3) == i)[1:8]
+  comp <- which(as.character(seqfishLabels$V3) == i)
+  if(length(comp) > 100){
+    comp[1:100]
+  } else {
+    comp
+  }
 }) %>% unlist()
 
 
