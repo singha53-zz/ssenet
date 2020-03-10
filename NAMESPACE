@@ -2,6 +2,7 @@
 
 S3method(predict,enet)
 S3method(predict,ssenet)
+export(customTheme)
 export(enet)
 export(enetCV)
 export(predict)
