@@ -7,7 +7,7 @@
 predict(object, ...)
 }
 \arguments{
-\item{x}{an object of a specific machine learning method (ML) class}
+\item{object}{an object of a specific machine learning method (ML) class}
 
 \item{validation}{a string type of validation; either "Mfold" or "loo"}
 
