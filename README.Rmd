@@ -1,14 +1,10 @@
-  
 ---
+output: github_document
+---
+
 title: "Semi-Supervised Elastic Net (ssenet)"
 author: "Amrit Singh"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
-output: 
-  html_document: 
-    keep_md: yes
-    toc: true
-    toc_depth: 5
----
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, cache = FALSE, warning = FALSE, message = FALSE)
@@ -169,14 +165,14 @@ cvErr %>%
 > Can scRNA-seq data be overlaid onto seqFISH for resolution enhancement?
 
 What are the advantages and performance of your approach?
-> The published approach trained a multiclass SVM on the scRNAseq data and applied it to the seqFISH data to estimate the cell-types labels. My approach uses a penalized regression method (glmnet) with a semi-supervised appraoch in order to build a model using both the scRNAseq+seqFISH data. This strategy uses a recursive approach that invovles multiple rounds of training glmnet models using labeled data (scRNAseq) and predicting the cell-type labels of unlabeled data (seqFISH). At each iteration, samples with high confidence (probability > 0.5) of belonging to a particular cell-type are retained for the next iteration, whereas a new glmnet model is trained with the scRNAseq data and seqFISH data with imputed cell-type labels with high confidence. This process is repeated until all cell-types in the seqFISH data have been labels or 50 iterations (in order to reduce compute times).
-  The advantage of this approach is that more data in used for model training such that the result model may generalize better to new data. The performance of this appraoch was estimated using cross-validation, using only the scRNAseq data as the test set.
+> The published approach trained a multiclass SVM on the scRNAseq data and applied it to the seqFISH data to estimate the cell-types labels. My approach uses a penalized regression method (glmnet) with a semi-supervised appraoch in order to build a model using both the scRNAseq+seqFISH data. This strategy uses a recursive approach that invovles multiple rounds of training glmnet models using labeled data (label and imputed) and predicting the cell-type labels of unlabeled data. At each iteration, cell-type labels with high confidence (probability > 0.5) are retained for the next iteration, where a new glmnet model is trained with the scRNAseq data and seqFISH data with imputed cell-type labels with high confidence. This process is repeated until all cell-types in the seqFISH data have been labeled or until 50 iterations have been reached (in order to reduce compute times).
+  The advantage of this approach is that more data in used for model training such that the resulting model may generalize better to new data. The performance of this appraoch was estimated using cross-validation, using only the scRNAseq data as the test set.
 
 ### What were the specific challenges you have encountered so far?
-> Compute time is significantly longer for the semi-supervised approach for model training. Cross-validation takes even longer. The datasets are restricted to 113 genes and therefore the discovery space is very limited for the semi-supervised approach to learn 
+> Compute times are significantly longer for the semi-supervised approach for model training. Thus, cross-validation takes even longer. The datasets are restricted to 113 genes and therefore the discovery space is very limited for the semi-supervised approach to learn classification rules that are superior to the supervised approach.
 
 ### How are you going to address those challenges?
-> Cross-validation was paralellized such that each iteration of cross-validation was run on an independent cpu thread. If the additional data is available for this study it may be better than the current results given that the genes are limited to those identified using the scRNAseq data only.
+> Cross-validation was parallelized such that each iteration of cross-validation was run on an independent cpu thread. If additional data is available for this study it may be better than the current results given that the genes are limited to those identified using the scRNAseq data only.
 
 ### Link to your preliminary code and results on a Github account (optional)
 > https://github.com/singha53/ssenet
