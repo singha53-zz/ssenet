@@ -16,6 +16,8 @@
 ssenet = function (xtrain, ytrain, alpha, lambda = NULL, family, xtest = NULL,
   ytest = NULL, filter = "p.value", topranked = 50, keepVar = NULL, useObsWeights = FALSE, max.iter = 100, perc.full = 1, thr.conf = 0.5) {
 
+  assertthat::assert_that(any(table(ytrain) > 0), msg = "0 cells for a given cell-types")
+
   # if observations weights are zero to NULL, default to 1 for each obseration
   if(!useObsWeights){
     weights <- rep(1, length(ytrain))
@@ -57,6 +59,7 @@ ssenet = function (xtrain, ytrain, alpha, lambda = NULL, family, xtest = NULL,
       weights = as.numeric((1/table(ytrain))[as.character(ytrain)])
     )
   }
+  assertthat::assert_that(any(table(ytrainImputed$pred) > 0), msg = "0 cells for a given cell-types")
 
   # Fit glmnet model for binary response
   if (family == "binomial") {
@@ -151,6 +154,8 @@ imputeLabels = function(x, y, alpha, lambda, family, max.iter = 100, perc.full =
     } else {
       weights <- as.numeric((1/table(ynew[labeled]))[as.character(ynew[labeled])])
     }
+
+    assertthat::assert_that(any(table(ynew[labeled]) > 0), msg = "Line158: 0 cells for a given cell-types")
 
     # Train classifier
     if(family == "binomial"){
