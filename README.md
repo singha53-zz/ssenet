@@ -1,6 +1,6 @@
 
 title: “Semi-Supervised Elastic Net (ssenet)” author: “Amrit Singh”
-date: “09 March, 2020”
+date: “10 March, 2020”
 
 # Analysis for the Abstract Submission to \#BIRSBioIntegration [Mathematical Frameworks for Integrative Analysis of Emerging Biological Data Types](https://www.birs.ca/events/2020/5-day-workshops/20w5197)
 
@@ -84,7 +84,7 @@ points(coord, col = mixOmics::color.mixo(as.numeric(seqfishLabels$V3)), pch = 19
 indices1 <- lapply(levels(scrnaseqLabels$V1), function(i){
   comp <- which(as.character(scrnaseqLabels$V1) == i)
   if(length(comp) > 100){
-    comp[1:100]
+    comp
   } else {
     comp
   }
@@ -92,7 +92,7 @@ indices1 <- lapply(levels(scrnaseqLabels$V1), function(i){
 indices2 <- lapply(levels(seqfishLabels$V3), function(i){
   comp <- which(as.character(seqfishLabels$V3) == i)
   if(length(comp) > 100){
-    comp[1:100]
+    comp
   } else {
     comp
   }
@@ -101,23 +101,23 @@ indices2 <- lapply(levels(seqfishLabels$V3), function(i){
 
 fitEnet <- enet(xtrain=t(scrnaseq[, indices1]), ytrain=scrnaseqLabels$V1[indices1], alpha = 1, lambda = NULL, family = "multinomial", 
   xtest = t(seqfish[, indices2]), ytest = seqfishLabels$V3[indices2], filter = "none", topranked = 50, keepVar = NULL, weights = NULL)
-cvEnet <- predict(object = fitEnet, validation="Mfold", M = 2, iter = 2, ncores = 2, progressBar = TRUE)
+cvEnet <- predict(object = fitEnet, validation="Mfold", M = 2, iter = 1, ncores = 1, progressBar = TRUE)
 cvEnet$perf
 ```
 
     ## # A tibble: 10 x 3
-    ##    ErrName                Mean      SD
-    ##    <chr>                 <dbl>   <dbl>
-    ##  1 Astrocyte            0      0      
-    ##  2 BER                  0.209  0.00758
-    ##  3 Endothelial Cell     0.121  0.0244 
-    ##  4 ER                   0.0957 0.0182 
-    ##  5 GABA-ergic Neuron    0.06   0.0141 
-    ##  6 Glutamatergic Neuron 0.06   0.0566 
-    ##  7 Microglia            0      0      
-    ##  8 Oligodendrocyte.1    0.289  0.112  
-    ##  9 Oligodendrocyte.2    0.917  0.118  
-    ## 10 Oligodendrocyte.3    0.226  0
+    ##    ErrName                Mean    SD
+    ##    <chr>                 <dbl> <dbl>
+    ##  1 Astrocyte            0.0465    NA
+    ##  2 BER                  0.287     NA
+    ##  3 Endothelial Cell     0.172     NA
+    ##  4 ER                   0.0760    NA
+    ##  5 GABA-ergic Neuron    0.0670    NA
+    ##  6 Glutamatergic Neuron 0.0542    NA
+    ##  7 Microglia            0.0455    NA
+    ##  8 Oligodendrocyte.1    0.526     NA
+    ##  9 Oligodendrocyte.2    1         NA
+    ## 10 Oligodendrocyte.3    0.387     NA
 
 ## Apply Semi-supervised Enet to scRNAseq+seqFISH data to determine cell-type labels
 
@@ -126,23 +126,23 @@ fitSSEnet <- ssenet(xtrain=t(cbind(scrnaseq[,indices1], seqfish[, indices2])), y
   alpha = 1, lambda = fitEnet$lambda, family = "multinomial", 
   xtest = t(seqfish[, indices2]), ytest = seqfishLabels$V3[indices2], filter = "none", topranked = 50, keepVar = NULL, 
   useObsWeights = FALSE, max.iter = 100, perc.full = 1, thr.conf = 0.5)
-cvSSEnet <- predict(object = fitSSEnet, validation="Mfold", M = 2, iter = 2, ncores = 2, progressBar = TRUE)
+cvSSEnet <- predict(object = fitSSEnet, validation="Mfold", M = 2, iter = 1, ncores = 1, progressBar = TRUE)
 cvSSEnet$perf
 ```
 
     ## # A tibble: 10 x 3
-    ##    ErrName                Mean      SD
-    ##    <chr>                 <dbl>   <dbl>
-    ##  1 Astrocyte            0.0465 0.0658 
-    ##  2 BER                  0.203  0.00490
-    ##  3 Endothelial Cell     0.138  0      
-    ##  4 ER                   0.117  0      
-    ##  5 GABA-ergic Neuron    0.135  0.00707
-    ##  6 Glutamatergic Neuron 0.045  0.00707
-    ##  7 Microglia            0.0455 0.0643 
-    ##  8 Oligodendrocyte.1    0.237  0.112  
-    ##  9 Oligodendrocyte.2    0.75   0.118  
-    ## 10 Oligodendrocyte.3    0.226  0.0456
+    ##    ErrName                Mean    SD
+    ##    <chr>                 <dbl> <dbl>
+    ##  1 Astrocyte            0         NA
+    ##  2 BER                  0.235     NA
+    ##  3 Endothelial Cell     0.0690    NA
+    ##  4 ER                   0.0737    NA
+    ##  5 GABA-ergic Neuron    0.0723    NA
+    ##  6 Glutamatergic Neuron 0.0591    NA
+    ##  7 Microglia            0         NA
+    ##  8 Oligodendrocyte.1    0.421     NA
+    ##  9 Oligodendrocyte.2    1         NA
+    ## 10 Oligodendrocyte.3    0.258     NA
 
 ## Compare supervised and semi-supervised Enet (Enet and SSEnet) predicted seqFISH cell-types labels with those estimated via the multiclass SVM used in the paper.
 
@@ -188,28 +188,28 @@ cvErr %>%
 
 ![](README_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
 
-| ErrName              |      Mean |        SD | method |
-| :------------------- | --------: | --------: | :----- |
-| Astrocyte            | 0.0000000 | 0.0000000 | Enet   |
-| BER                  | 0.2090796 | 0.0075758 | Enet   |
-| Endothelial Cell     | 0.1206897 | 0.0243830 | Enet   |
-| ER                   | 0.0957143 | 0.0181827 | Enet   |
-| GABA-ergic Neuron    | 0.0600000 | 0.0141421 | Enet   |
-| Glutamatergic Neuron | 0.0600000 | 0.0565685 | Enet   |
-| Microglia            | 0.0000000 | 0.0000000 | Enet   |
-| Oligodendrocyte.1    | 0.2894737 | 0.1116484 | Enet   |
-| Oligodendrocyte.2    | 0.9166667 | 0.1178511 | Enet   |
-| Oligodendrocyte.3    | 0.2258065 | 0.0000000 | Enet   |
-| Astrocyte            | 0.0465116 | 0.0657774 | SSEnet |
-| BER                  | 0.2028182 | 0.0048969 | SSEnet |
-| Endothelial Cell     | 0.1379310 | 0.0000000 | SSEnet |
-| ER                   | 0.1171429 | 0.0000000 | SSEnet |
-| GABA-ergic Neuron    | 0.1350000 | 0.0070711 | SSEnet |
-| Glutamatergic Neuron | 0.0450000 | 0.0070711 | SSEnet |
-| Microglia            | 0.0454545 | 0.0642824 | SSEnet |
-| Oligodendrocyte.1    | 0.2368421 | 0.1116484 | SSEnet |
-| Oligodendrocyte.2    | 0.7500000 | 0.1178511 | SSEnet |
-| Oligodendrocyte.3    | 0.2258065 | 0.0456198 | SSEnet |
+| ErrName              |      Mean | SD | method |
+| :------------------- | --------: | -: | :----- |
+| Astrocyte            | 0.0465116 | NA | Enet   |
+| BER                  | 0.2873746 | NA | Enet   |
+| Endothelial Cell     | 0.1724138 | NA | Enet   |
+| ER                   | 0.0760302 | NA | Enet   |
+| GABA-ergic Neuron    | 0.0670171 | NA | Enet   |
+| Glutamatergic Neuron | 0.0541872 | NA | Enet   |
+| Microglia            | 0.0454545 | NA | Enet   |
+| Oligodendrocyte.1    | 0.5263158 | NA | Enet   |
+| Oligodendrocyte.2    | 1.0000000 | NA | Enet   |
+| Oligodendrocyte.3    | 0.3870968 | NA | Enet   |
+| Astrocyte            | 0.0000000 | NA | SSEnet |
+| BER                  | 0.2349337 | NA | SSEnet |
+| Endothelial Cell     | 0.0689655 | NA | SSEnet |
+| ER                   | 0.0737086 | NA | SSEnet |
+| GABA-ergic Neuron    | 0.0722733 | NA | SSEnet |
+| Glutamatergic Neuron | 0.0591133 | NA | SSEnet |
+| Microglia            | 0.0000000 | NA | SSEnet |
+| Oligodendrocyte.1    | 0.4210526 | NA | SSEnet |
+| Oligodendrocyte.2    | 1.0000000 | NA | SSEnet |
+| Oligodendrocyte.3    | 0.2580645 | NA | SSEnet |
 
 > The semi-supervised approach performs slightly better for the lower
 > abundant cell-types.

@@ -68,7 +68,7 @@ points(coord, col = mixOmics::color.mixo(as.numeric(seqfishLabels$V3)), pch = 19
 indices1 <- lapply(levels(scrnaseqLabels$V1), function(i){
   comp <- which(as.character(scrnaseqLabels$V1) == i)
   if(length(comp) > 100){
-    comp[1:100]
+    comp
   } else {
     comp
   }
@@ -76,7 +76,7 @@ indices1 <- lapply(levels(scrnaseqLabels$V1), function(i){
 indices2 <- lapply(levels(seqfishLabels$V3), function(i){
   comp <- which(as.character(seqfishLabels$V3) == i)
   if(length(comp) > 100){
-    comp[1:100]
+    comp
   } else {
     comp
   }
@@ -85,7 +85,7 @@ indices2 <- lapply(levels(seqfishLabels$V3), function(i){
 
 fitEnet <- enet(xtrain=t(scrnaseq[, indices1]), ytrain=scrnaseqLabels$V1[indices1], alpha = 1, lambda = NULL, family = "multinomial", 
   xtest = t(seqfish[, indices2]), ytest = seqfishLabels$V3[indices2], filter = "none", topranked = 50, keepVar = NULL, weights = NULL)
-cvEnet <- predict(object = fitEnet, validation="Mfold", M = 2, iter = 2, ncores = 2, progressBar = TRUE)
+cvEnet <- predict(object = fitEnet, validation="Mfold", M = 2, iter = 1, ncores = 1, progressBar = TRUE)
 cvEnet$perf
 ```
 
@@ -96,7 +96,7 @@ fitSSEnet <- ssenet(xtrain=t(cbind(scrnaseq[,indices1], seqfish[, indices2])), y
   alpha = 1, lambda = fitEnet$lambda, family = "multinomial", 
   xtest = t(seqfish[, indices2]), ytest = seqfishLabels$V3[indices2], filter = "none", topranked = 50, keepVar = NULL, 
   useObsWeights = FALSE, max.iter = 100, perc.full = 1, thr.conf = 0.5)
-cvSSEnet <- predict(object = fitSSEnet, validation="Mfold", M = 2, iter = 2, ncores = 2, progressBar = TRUE)
+cvSSEnet <- predict(object = fitSSEnet, validation="Mfold", M = 2, iter = 1, ncores = 1, progressBar = TRUE)
 cvSSEnet$perf
 ```
 
