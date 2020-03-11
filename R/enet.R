@@ -13,8 +13,17 @@
 #' @param keepVar - names of specific variable to keep in model
 #' @param weights - observational weights; default to 1
 #' @export
-enet = function (xtrain, ytrain, alpha, lambda = NULL, family, xtest = NULL,
+enet = function (xtrain, ytrain, alpha, lambda = NULL, lambda_nfolds=3, family, xtest = NULL,
   ytest = NULL, filter = "p.value", topranked = 50, keepVar = NULL, weights = NULL) {
+
+  # Check format of data input
+  assertthat::assert_that(class(xtrain) == "matrix", msg = "xtrain must be a matrix!")
+  assertthat::assert_that(ifelse(is.null(xtest), TRUE, class(xtest) == "matrix"), msg = "xtest must be a matrix!")
+  assertthat::assert_that(class(ytrain) == "factor", msg = "ytrain must be a factor!")
+  assertthat::assert_that(ifelse(is.null(ytest), TRUE, class(ytest) == "factor"), msg = "ytest must be a factor!")
+
+  # Check that the number of samples in the minority classes has more than lambda_nfolds
+  assertthat::assert_that(min(table(ytrain)) > lambda_nfolds, msg = "Minority class has less samples than lambda_nfolds!")
 
   # if observations weights are zero to NULL, default to 1 for each obseration
   if(is.null(weights)){
@@ -41,39 +50,25 @@ enet = function (xtrain, ytrain, alpha, lambda = NULL, family, xtest = NULL,
     penalty.factor <- c(rep(1, ncol(x1train)), rep(0, length(keepVar)))
   }
 
-  # Fit glmnet model for binary response
-  if (family == "binomial") {
-    fit <- glmnet::glmnet(x2train, ytrain, family = "binomial", alpha = alpha,
-      penalty.factor = penalty.factor, weights = weights)
-    if (is.null(lambda)) {
-      cv.fit <- glmnet::cv.glmnet(x2train, ytrain, family = "binomial", weights = weights)
-      lambda = cv.fit$lambda.min
-    } else {
-      lambda = lambda
-    }
-    Coefficients <- coef(fit, s = lambda)
-    Active.Index <- which(Coefficients[, 1] != 0)
-    Active.Coefficients <- Coefficients[Active.Index, ]
-    enet.panel <- names(Active.Coefficients)[-1]
-    enet.panel.length <- length(enet.panel)
+  # set model parameters
+  glmnet_default_params <- list(x = x2train, y = ytrain, alpha = alpha,
+    penalty.factor = penalty.factor, weights = weights)
+  cvglmnet_default_params <- list(x = x2train, y = ytrain, weights = weights, nfolds = lambda_nfolds)
+  if(family == "binomial"){
+    args_glmnet <- list(family = "binomial")
+    args_cvglmnet <- list(family = "binomial")
+  }
+  if(family == "multinomial"){
+    args_glmnet <- list(family = "multinomial", type.multinomial = "grouped")
+    args_cvglmnet <- list(family = "multinomial")
   }
 
-  # Fit glmnet model for multi-class response
-  if (family == "multinomial") {
-    fit <- glmnet::glmnet(x2train, ytrain, family = "multinomial", alpha = alpha,
-      type.multinomial = "grouped", penalty.factor = penalty.factor, weights = weights)
-    if (is.null(lambda)) {
-      cv.fit <- glmnet::cv.glmnet(x2train, ytrain, family = "multinomial", weights = weights)
-      lambda = cv.fit$lambda.min
-    } else {
-      lambda = lambda
-    }
-    Coefficients <- coef(fit, s = lambda)
-    Active.Index <- which(Coefficients[[1]][, 1] != 0)
-    Active.Coefficients <- Coefficients[[1]][Active.Index,]
-    enet.panel <- names(Active.Coefficients)[-1]
-    enet.panel.length <- length(enet.panel)
-  }
+  # Fit model
+  fit <- do.call(glmnet::glmnet, c(glmnet_default_params, args_glmnet))
+  cv.fit <- do.call(glmnet::cv.glmnet, c(cvglmnet_default_params, args_cvglmnet))
+  lambda <- ifelse(is.null(lambda), cv.fit$lambda.1se, lambda)
+  features <- extractFeatures(fit, lambda, family)
+
 
   # Apply model to test data if provided
   if (!is.null(xtest)) {
@@ -95,9 +90,9 @@ enet = function (xtrain, ytrain, alpha, lambda = NULL, family, xtest = NULL,
   } else {
     perfTest <- predictResponse <- probs <- NA
   }
-  result <- list(xtrain = xtrain, ytrain = ytrain, fit = fit, enet.panel = enet.panel,
-    lambda = lambda, alpha = alpha, family = family, probs = probs,
-    Active.Coefficients = Active.Coefficients, perfTest = perfTest,
+  result <- list(xtrain = xtrain, ytrain = ytrain, fit = fit, enet.panel = features$enet.panel,
+    lambda = lambda, lambda_nfolds=lambda_nfolds, alpha = alpha, family = family, probs = probs,
+    Active.Coefficients = features$Active.Coefficients, perfTest = perfTest,
     predictResponse = predictResponse, filter = filter, topranked = topranked, keepVar=keepVar, weights = weights)
   class(result) <- "enet"
   return(result)

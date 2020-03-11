@@ -8,8 +8,8 @@
 #' @param ncores an object of a specific machine learning method (ML) class
 #' @param progressBar a boolean that specifies whether a progress bar should be displayed or not
 #' @export
-predict.ssenet = function (object, validation = c("Mfold", "loo"), M = 5, iter = 10,
-  ncores = 4, progressBar = TRUE) {
+predict.ssenet = function (object, M = 5, iter = 10, ncores = 4, progressBar = TRUE) {
+  assertthat::assert_that(M > 1, msg = "At least 2 folds (M) are required to run cross-validation!")
   X <- object$xtrain
   y <- object$ytrain
   Xlabeled <- X[!is.na(y), ]
@@ -20,6 +20,7 @@ predict.ssenet = function (object, validation = c("Mfold", "loo"), M = 5, iter =
   alpha <- object$alpha
   family <- object$family
   lambda <- object$lambda
+  lambda_nfolds <- object$lambda_nfolds
   filter <- object$filter
   topranked  <- object$topranked
   keepVar  <- object$keepVar
@@ -27,28 +28,28 @@ predict.ssenet = function (object, validation = c("Mfold", "loo"), M = 5, iter =
   max.iter <- object$max.iter
   perc.full <- object$perc.full
   thr.conf <- object$thr.conf
-  if (validation == "Mfold") {
+  if (M > 1) {
     folds <- lapply(1:iter, function(i) caret::createFolds(ylabeled, k = M))
     cl <- parallel::makeCluster(mc <- getOption("cl.cores", ncores))
     parallel::clusterCall(cl, function() library("ssenet"))
-    parallel::clusterExport(cl, varlist = c("Xlabeled", "Xunlabeled", "ylabeled", "yunlabeled", "alpha", "lambda", "folds", "progressBar",
+    parallel::clusterExport(cl, varlist = c("Xlabeled", "Xunlabeled", "ylabeled", "yunlabeled", "alpha", "lambda", "lambda_nfolds", "folds", "progressBar",
       "family", "filter", "topranked", "keepVar", "useObsWeights"), envir = environment())
     cv <- parallel::parLapply(cl, folds, function(foldsi,
-      Xlabeled, Xunlabeled, ylabeled, yunlabeled, alpha, lambda, progressBar, family, filter,
+      Xlabeled, Xunlabeled, ylabeled, yunlabeled, alpha, lambda, lambda_nfolds, progressBar, family, filter,
       topranked, keepVar, useObsWeights, max.iter, perc.full, thr.conf) {
-      ssenet::ssenetCV(Xlabeled = Xlabeled, Xunlabeled = Xunlabeled, ylabeled =ylabeled, yunlabeled = yunlabeled, alpha = alpha, lambda = lambda,
+      ssenet::ssenetCV(Xlabeled = Xlabeled, Xunlabeled = Xunlabeled, ylabeled =ylabeled, yunlabeled = yunlabeled, alpha = alpha, lambda = lambda, lambda_nfolds = lambda_nfolds,
         folds = foldsi, progressBar = progressBar,
         family = family, filter = filter, topranked = topranked,
         keepVar=keepVar, useObsWeights = useObsWeights,
         max.iter = max.iter, perc.full = perc.full, thr.conf = thr.conf)
-    }, Xlabeled, Xunlabeled, ylabeled, yunlabeled, alpha, lambda, progressBar, family, filter,
+    }, Xlabeled, Xunlabeled, ylabeled, yunlabeled, alpha, lambda, lambda_nfolds, progressBar, family, filter,
       topranked, keepVar, useObsWeights, max.iter, perc.full, thr.conf) %>% ssenet::zip_nPure()
     parallel::stopCluster(cl)
     perf <- do.call(rbind, cv$perf) %>% as.data.frame %>%
       tidyr::gather(ErrName, Err) %>% dplyr::group_by(ErrName) %>%
       dplyr::summarise(Mean = mean(Err), SD = sd(Err))
   } else {
-    stop("The validation argument must be set to Mfold!")
+    assertthat::assert_that((min(table(y))/M) > 3, msg = "M value too large!")
   }
   result = list()
   result$folds = folds
@@ -74,7 +75,7 @@ predict.ssenet = function (object, validation = c("Mfold", "loo"), M = 5, iter =
 #' @param keepVar - names of specific variable to keep in model
 #' @param weights - observational weights; default to 1
 #' @export
-ssenetCV = function(Xlabeled, Xunlabeled, ylabeled, yunlabeled, alpha, lambda, folds, progressBar, family,
+ssenetCV = function(Xlabeled, Xunlabeled, ylabeled, yunlabeled, alpha, lambda, lambda_nfolds, folds, progressBar, family,
   filter, topranked, keepVar, useObsWeights, max.iter, perc.full, thr.conf) {
   M <- length(folds)
   probs <- predictResponseList <- enet.panel <- list()
@@ -90,6 +91,7 @@ ssenetCV = function(Xlabeled, Xunlabeled, ylabeled, yunlabeled, alpha, lambda, f
     ytest = ylabeled[omit]
 
     fit <- ssenet::ssenet(xtrain=xtrain, ytrain=ytrain, alpha = alpha, lambda = lambda,
+      lambda_nfolds = lambda_nfolds,
       family = family, xtest = xtest, ytest = ytest, filter = filter,
       topranked = topranked, keepVar = keepVar, useObsWeights = useObsWeights,
       max.iter = max.iter, perc.full = perc.full, thr.conf = thr.conf)

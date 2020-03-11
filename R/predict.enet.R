@@ -8,43 +8,42 @@
 #' @param ncores an object of a specific machine learning method (ML) class
 #' @param progressBar a boolean that specifies whether a progress bar should be displayed or not
 #' @export
-predict.enet = function (object, validation = c("Mfold", "loo"), M = 5, iter = 10,
+predict.enet = function (object, M = 5, iter = 10,
   ncores = 4, progressBar = TRUE) {
+  assertthat::assert_that(M > 1, msg = "At least 2 folds (M) are required to run cross-validation!")
   X <- object$xtrain
   y <- object$ytrain
   n <- nrow(X)
   alpha <- object$alpha
   family <- object$family
   lambda <- object$lambda
+  lambda_nfolds <- object$lambda_nfolds
   filter <- object$filter
   topranked  <- object$topranked
   keepVar  <- object$keepVar
   weights <- object$weights
-  if (validation == "Mfold") {
+  if (M > 1) {
     folds <- lapply(1:iter, function(i) caret::createFolds(y, k = M))
     cl <- parallel::makeCluster(mc <- getOption("cl.cores", ncores))
     parallel::clusterCall(cl, function() library("ssenet"))
-    parallel::clusterExport(cl, varlist = c("X", "y", "alpha", "lambda", "folds", "progressBar",
+    parallel::clusterExport(cl, varlist = c("X", "y", "alpha", "lambda", 'lambda_nfolds', "folds", "progressBar",
       "family", "filter", "topranked", "keepVar", "weights"), envir = environment())
     cv <- parallel::parLapply(cl, folds, function(foldsi,
-      X, y, alpha, lambda, progressBar, family, filter,
+      X, y, alpha, lambda, lambda_nfolds, progressBar, family, filter,
       topranked, keepVar, weights) {
       ssenet::enetCV(X = X, y = y, alpha = alpha, lambda = lambda,
+        lambda_nfolds = lambda_nfolds,
         folds = foldsi, progressBar = progressBar,
         family = family, filter = filter, topranked = topranked,
         keepVar=keepVar, weights = weights)
-    }, X, y, alpha, lambda, progressBar, family, filter,
+    }, X, y, alpha, lambda, lambda_nfolds, progressBar, family, filter,
       topranked, keepVar, weights) %>% ssenet::zip_nPure()
     parallel::stopCluster(cl)
     perf <- do.call(rbind, cv$perf) %>% as.data.frame %>%
       tidyr::gather(ErrName, Err) %>% dplyr::group_by(ErrName) %>%
       dplyr::summarise(Mean = mean(Err), SD = sd(Err))
   } else {
-    folds = split(1:n, rep(1:n, length = n))
-    cv <- ssenet::enetCV(X, y, alpha, lambda, folds, progressBar,
-      family, filter, topranked, keepVar, weights)
-    perf <- data.frame(Mean = cv$perf) %>% mutate(ErrName = rownames(.))
-    perf$SD <- NA
+    assertthat::assert_that((min(table(y))/M) > 3, msg = "M value too large!")
   }
   result = list()
   result$folds = folds
@@ -70,7 +69,7 @@ predict.enet = function (object, validation = c("Mfold", "loo"), M = 5, iter = 1
 #' @param keepVar - names of specific variable to keep in model
 #' @param weights - observational weights; default to 1
 #' @export
-enetCV = function (X, y, alpha, lambda, folds, progressBar, family,
+enetCV = function (X, y, alpha, lambda, lambda_nfolds, folds, progressBar, family,
   filter, topranked, keepVar, weights) {
   M <- length(folds)
   probs <- predictResponseList <- enet.panel <- list()
@@ -86,6 +85,7 @@ enetCV = function (X, y, alpha, lambda, folds, progressBar, family,
     ytest = y[omit]
 
     fit <- ssenet::enet(xtrain=xtrain, ytrain=ytrain, alpha = alpha, lambda = lambda,
+      lambda_nfolds = lambda_nfolds,
       family = family, xtest = xtest, ytest = ytest, filter = filter,
       topranked = topranked, keepVar = keepVar, weights = weights[-omit])
     probs[[i]] <- fit$probs

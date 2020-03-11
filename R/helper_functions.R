@@ -142,3 +142,19 @@ tperformance = function (weights, trueLabels)
     "AUC")
   optimalValues
 }
+
+#' @export
+extractFeatures = function(fit, lambda, family){
+  Coefficients <- coef(fit, s = lambda)
+  if(family == "binomial"){
+    Active.Index <- which(Coefficients[, 1] != 0)
+    Active.Coefficients <- Coefficients[Active.Index, ]
+  }
+  if(family == "multinomial"){
+    Active.Index <- which(Coefficients[[1]][, 1] != 0)
+    Active.Coefficients <- Coefficients[[1]][Active.Index,]
+  }
+  enet.panel <- names(Active.Coefficients)[-1]
+  enet.panel.length <- length(enet.panel)
+  return(list(Active.Coefficients=Active.Coefficients, enet.panel=enet.panel))
+}
