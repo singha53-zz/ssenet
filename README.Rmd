@@ -6,7 +6,7 @@ title: "Semi-Supervised Elastic Net (ssenet)"
 author: "Amrit Singh"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 
-```{r setup, include=FALSE}
+```{r setup, include=TRUE}
 knitr::opts_chunk$set(echo = TRUE, cache = FALSE, warning = FALSE, message = FALSE)
 
 library(magrittr); 
@@ -14,6 +14,7 @@ library(knitr);
 library(ssenet); ## devtools::install_github("singha53/ssenet")
 library(ggplot2);
 library(dplyr);
+library(UpSetR);
 ```
 
 # Analysis for the Abstract Submission to #BIRSBioIntegration [Mathematical Frameworks for Integrative Analysis of Emerging Biological Data Types](https://www.birs.ca/events/2020/5-day-workshops/20w5197)
@@ -62,66 +63,55 @@ points(coord, col = mixOmics::color.mixo(as.numeric(seqfishLabels$V3)), pch = 19
 ## 2) What is the minimal number of genes needed for data integration?
 ## 3) Are there signatures of cellular co-localization or spatial coordinates in non-spatial scRNA-seq data?
 
+### remove cells with little data
+
+```{r}
+# set constants
+M = 5;
+iter = 5;
+ncores = 5;
+alpha = 1;
+lambda_nfolds = 3;
+family = "multinomial";
+filter = "none";
+max.iter = 50;
+perc.full = 1;
+thr.conf = 0.5;
+
+## minimum number of samples required per cell-type class (required for hyperparameter tuning and cross-validation)
+round(table(scrnaseqLabels$V1)/M/lambda_nfolds, 0)  # remove Oligodendrocyte.2
+
+keepIndices <- which(scrnaseqLabels$V1 != "Oligodendrocyte.2")
+xscrnaseq <- scrnaseq[, keepIndices]
+yscrnaseq <- droplevels(scrnaseqLabels$V1[keepIndices])
+```
+
 ## Apply Enet to scRNAseq data and apply to seqFISH to determine cell-type labels
 
 ```{r}
-indices1 <- lapply(levels(scrnaseqLabels$V1), function(i){
-  comp <- which(as.character(scrnaseqLabels$V1) == i)
-  if(length(comp) > 100){
-    comp
-  } else {
-    comp
-  }
-}) %>% unlist()
-indices2 <- lapply(levels(seqfishLabels$V3), function(i){
-  comp <- which(as.character(seqfishLabels$V3) == i)
-  if(length(comp) > 100){
-    comp
-  } else {
-    comp
-  }
-}) %>% unlist()
-
-
-fitEnet <- enet(xtrain=t(scrnaseq[, indices1]), ytrain=scrnaseqLabels$V1[indices1], alpha = 1, lambda = NULL, family = "multinomial", 
-  xtest = t(seqfish[, indices2]), ytest = seqfishLabels$V3[indices2], filter = "none", topranked = 50, keepVar = NULL, weights = NULL)
-cvEnet <- predict(object = fitEnet, validation="Mfold", M = 2, iter = 1, ncores = 1, progressBar = TRUE)
+fitEnet <- enet(xtrain = t(xscrnaseq), ytrain = yscrnaseq, alpha = alpha, lambda = NULL, lambda_nfolds = lambda_nfolds, family = "multinomial", filter = filter)
+cvEnet <- predict(object = fitEnet, M = M, iter = iter, ncores = ncores)
 cvEnet$perf
 ```
 
 ## Apply Semi-supervised Enet to scRNAseq+seqFISH data to determine cell-type labels
 
 ```{r}
-fitSSEnet <- ssenet(xtrain=t(cbind(scrnaseq[,indices1], seqfish[, indices2])), ytrain=factor(c(as.character(scrnaseqLabels$V1[indices1]), rep(NA, ncol(seqfish))[indices2])), 
-  alpha = 1, lambda = fitEnet$lambda, family = "multinomial", 
-  xtest = t(seqfish[, indices2]), ytest = seqfishLabels$V3[indices2], filter = "none", topranked = 50, keepVar = NULL, 
-  useObsWeights = FALSE, max.iter = 100, perc.full = 1, thr.conf = 0.5)
-cvSSEnet <- predict(object = fitSSEnet, validation="Mfold", M = 2, iter = 1, ncores = 1, progressBar = TRUE)
+fitSSEnet <- ssenet(xtrain = t(cbind(xscrnaseq, seqfish)), 
+  ytrain=factor(c(as.character(yscrnaseq), rep(NA, ncol(seqfish)))), 
+  alpha = alpha, lambda = fitEnet$lambda, lambda_nfolds = lambda_nfolds, family = "multinomial", 
+  filter = filter,
+  max.iter = max.iter, perc.full = perc.full, thr.conf = thr.conf)
+cvSSEnet <- predict(object = fitSSEnet, M = M, iter = iter, ncores = ncores)
 cvSSEnet$perf
 ```
-
-## Compare supervised and semi-supervised Enet (Enet and SSEnet) predicted seqFISH cell-types labels with those estimated via the multiclass SVM used in the paper.
-
-```{r}
-data.frame(err = c(fitEnet$perfTest, fitSSEnet$perfTest),
-  errName = factor(rep(names(fitEnet$perfTest), 2), names(fitEnet$perfTest)),
-  type = rep(c("Enet", "SSEnet"), each = length(fitEnet$perfTest))) %>% 
-  ggplot(aes(x = errName, y = err, fill = type)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  customTheme(sizeStripFont = 15, xAngle = 40, hjust = 1, vjust = 1, 
-    xSize = 10, ySize = 10, xAxisSize = 15, yAxisSize = 15) +
-  ylab("Error") +
-  xlab("Cell-type, ER (error rate), BER (balanced error rate)")
-```
-
-> SSEnet predicted cell-type labels have less correspondence with the multiclass SVM predict cell-types labels as compared to Enet only. The major cell-types GABA-ergic Neuron and Glutamatergic Neuron have lower error rates than the other cell-types both both Enet and SSEnet.
 
 ## Compare supervised and semi-supervised Enet (Enet and SSEnet) performance using cross-validation
 
 ```{r}
 cvErr <- rbind(cvEnet$perf, cvSSEnet$perf) %>% 
   mutate(method = rep(c("Enet", "SSEnet"), each = nrow(cvEnet$perf))) %>% 
-  mutate(ErrName = factor(ErrName, names(fitEnet$perfTest)))
+  mutate(ErrName = factor(ErrName, c(levels(yscrnaseq), "ER", "BER")))
 pd <- position_dodge(0.5)
 cvErr %>% 
   ggplot(aes(x = ErrName, y = Mean, color = method)) +
@@ -139,7 +129,15 @@ cvErr %>%
 
 `r kable(cvErr)`
 
-> The semi-supervised approach performs slightly better for the lower abundant cell-types. 
+## Overlap between selected features with those used in the Nature paper (SVM)
+
+```{r}
+panels = list(SVM = selectedGenes, Enet = fitEnet$enet.panel, SSEnet = fitSSEnet$enet.panel)
+
+Input <- fromList(panels)
+metadata <- data.frame(Methods=colnames(Input))
+upset(Input, sets = colnames(Input))
+```
 
 
 ## Abstract
