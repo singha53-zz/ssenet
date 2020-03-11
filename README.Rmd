@@ -122,9 +122,7 @@ cvErr %>%
   ylab("Average error rate (5x5 cross-validation)") +
   xlab("Cell-type, ER (error rate), BER (balanced error rate)") +
   customTheme(sizeStripFont = 15, xAngle = 40, hjust = 1, vjust = 1, 
-    xSize = 10, ySize = 10, xAxisSize = 15, yAxisSize = 15) +
-  ylab("Error") +
-  xlab("Cell-type, ER (error rate), BER (balanced error rate)")
+    xSize = 10, ySize = 10, xAxisSize = 15, yAxisSize = 15)
 ```
 
 `r kable(cvErr)`
