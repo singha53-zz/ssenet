@@ -6,12 +6,11 @@ title: "Semi-Supervised Elastic Net (ssenet)"
 author: "Amrit Singh"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 
-```{r setup, include=TRUE}
+```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, cache = FALSE, warning = FALSE, message = FALSE)
 
 library(magrittr); 
 library(knitr);
-library(ssenet); ## devtools::install_github("singha53/ssenet")
 library(ggplot2);
 library(dplyr);
 library(UpSetR);
@@ -27,6 +26,7 @@ library(UpSetR);
   * Applied the SVM classification model to the bias-correct, quantile normalized seqFISH data to assign cell types.
 
 ```{r}
+library(ssenet); ## devtools::install_github("singha53/ssenet")
 include_graphics("inst/extdata/suppTable2.png")
 
 selectedGenes <- c("fbll1", "itpr2", "vps13c", "tnfrsf1b", "sox2",
@@ -119,7 +119,7 @@ cvErr %>%
   geom_line(position=pd) +
   geom_point(position=pd, size = 3) +
   theme_bw() +
-  ylab("Average error rate (2x2 cross-validation)") +
+  ylab("Average error rate (5x5 cross-validation)") +
   xlab("Cell-type, ER (error rate), BER (balanced error rate)") +
   customTheme(sizeStripFont = 15, xAngle = 40, hjust = 1, vjust = 1, 
     xSize = 10, ySize = 10, xAxisSize = 15, yAxisSize = 15) +
