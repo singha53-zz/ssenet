@@ -118,6 +118,8 @@ qnmLabels$scrnaseq$V1 <- droplevels(qnmLabels$scrnaseq$V1)
 Compare cell-type label predictions using different methods and data normalizations
 -----------------------------------------------------------------------------------
 
+* see details of [data normalizations](https://github.com/singha53/ssenet/blob/test/inst/extdata/data_compilation.md)
+
 ``` r
 data_norms <- names(cortex)
 cl <- parallel::makeCluster(mc <- getOption("cl.cores", length(data_norms)))
