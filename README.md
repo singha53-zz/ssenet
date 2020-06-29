@@ -75,7 +75,7 @@ Questions for the BIRSBiointegration workshop:
 # set constants
 M = 2; iter = 2;
 ncores = iter;
-alpha = 0;
+alpha = 1;
 lambda = NULL;
 lambda_nfolds = 3;
 family = "multinomial";
@@ -117,8 +117,6 @@ qnmLabels$scrnaseq$V1 <- droplevels(qnmLabels$scrnaseq$V1)
 
 Compare cell-type label predictions using different methods and data normalizations
 -----------------------------------------------------------------------------------
-
-* see details of [data normalizations](https://github.com/singha53/ssenet/blob/test/inst/extdata/data_compilation.md)
 
 ``` r
 data_norms <- names(cortex)
