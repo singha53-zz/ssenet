@@ -175,3 +175,20 @@ aheatmap(gower.dist(t(allpreds)),
 
 ## PCA
 
+```{r}
+pcs <- prcomp((1-gower.dist(t(allpreds))), scale. = TRUE, rank. = 2)
+
+pcs$x %>% 
+  as.data.frame() %>% 
+  mutate(Normalization = data_type, Method = method) %>% 
+  ggplot(aes(x = PC1, y = PC2, color = Normalization, shape = Method, group = Normalization)) +
+  geom_point() +
+  geom_line() +
+  theme(legend.position = "bottom") +
+  ggtitle("Cell-type predictions using different classifiers and data normalizations") +
+  theme_bw() +
+  xlab(paste0("PC1 (", round(100*pcs$sdev[1]/sum(pcs$sdev), 0), "%)")) +
+  ylab(paste0("PC2 (", round(100*pcs$sdev[2]/sum(pcs$sdev), 0), "%)"))
+
+```
+
