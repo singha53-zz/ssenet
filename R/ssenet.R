@@ -14,7 +14,7 @@
 #' @param weights - observational weights; default to 1
 #' @export
 ssenet = function (xtrain, ytrain, alpha, lambda = NULL, lambda_nfolds=3, family, xtest = NULL,
-  ytest = NULL, filter = "p.value", topranked = 50, keepVar = NULL, useObsWeights = FALSE, max.iter = 100, perc.full = 1, thr.conf = 0.5) {
+  ytest = NULL, filter = "none", topranked = 50, keepVar = NULL, useObsWeights = FALSE, max.iter = 100, perc.full = 1, thr.conf = 0.5) {
 
   # Check that ytrain has missing data
   assertthat::assert_that(sum(is.na(ytrain)) > 0, msg = "ytrain must have some missing labels")
@@ -64,13 +64,32 @@ ssenet = function (xtrain, ytrain, alpha, lambda = NULL, lambda_nfolds=3, family
     penalty.factor <- c(rep(1, ncol(x1train)), rep(0, length(keepVar)))
   }
 
+  if (is.null(lambda)) {
+    cv.fit <- glmnet::cv.glmnet(x2train[!is.na(ytrain), ],
+                                ytrain[!is.na(ytrain)],
+                                family="multinomial",
+                                type.multinomial = "grouped")
+    lambda = cv.fit$lambda.min
+  } else {
+    lambda = lambda
+  }
+
   ytrainImputed <- ssenet::imputeLabels(x2train, ytrain, alpha, lambda, lambda_nfolds, family, max.iter, perc.full, thr.conf, useObsWeights)
   assertthat::assert_that(any(table(ytrainImputed$pred) > 3), msg = "3 obs must be present for a given cell-type")
 
+  # remove sample with 1 or 0 observations
+  keepObs <- as.character(ytrainImputed$pred) %in% names(table(ytrainImputed$pred))[table(ytrainImputed$pred) > 1]
+
   # set model parameters
-  glmnet_default_params <- list(x = x2train, y = factor(ytrainImputed$pred, levels(ytrain)), alpha = alpha,
-    penalty.factor = penalty.factor, weights = weights)
-  cvglmnet_default_params <- list(x = x2train, y = factor(ytrainImputed$pred, levels(ytrain)), weights = ytrainImputed$weights, nfolds = lambda_nfolds)
+  glmnet_default_params <- list(x = xtrain[keepObs, ],
+                                y = factor(ytrainImputed$pred[keepObs]),
+                                alpha = alpha,
+                                penalty.factor = penalty.factor,
+                                weights = ytrainImputed$weights[keepObs])
+  cvglmnet_default_params <- list(x = xtrain[keepObs, ],
+                                  y = factor(ytrainImputed$pred[keepObs]),
+                                  weights = ytrainImputed$weights[keepObs],
+                                  nfolds = lambda_nfolds)
   if(family == "binomial"){
     args_glmnet <- list(family = "binomial")
     args_cvglmnet <- list(family = "binomial")
@@ -82,8 +101,8 @@ ssenet = function (xtrain, ytrain, alpha, lambda = NULL, lambda_nfolds=3, family
 
   # Fit model
   fit <- do.call(glmnet::glmnet, c(glmnet_default_params, args_glmnet))
-  cv.fit <- do.call(glmnet::cv.glmnet, c(cvglmnet_default_params, args_cvglmnet))
-  lambda <- ifelse(is.null(lambda), cv.fit$lambda.1se, lambda)
+  # cv.fit <- do.call(glmnet::cv.glmnet, c(cvglmnet_default_params, args_cvglmnet))
+  lambda <- ifelse(is.null(lambda), do.call(glmnet::cv.glmnet, c(cvglmnet_default_params, args_cvglmnet))$lambda.min, lambda)
   features <- extractFeatures(fit, lambda, family)
 
   # Apply model to test data if provided
@@ -108,7 +127,7 @@ ssenet = function (xtrain, ytrain, alpha, lambda = NULL, lambda_nfolds=3, family
   }
   result <- list(xtrain = xtrain, ytrain = ytrain, fit = fit, enet.panel = features$enet.panel,
     lambda = lambda, lambda_nfolds = lambda_nfolds, alpha = alpha, family = family, probs = probs,
-    Active.Coefficients = features$Active.Coefficients, perfTest = perfTest,
+    Active.Coefficients = features$Active.Coefficients, perfTest = perfTest, ytrainImputed=ytrainImputed,
     predictResponse = predictResponse, filter = filter, topranked = topranked, keepVar=keepVar,
     useObsWeights = useObsWeights, max.iter = max.iter, perc.full = perc.full, thr.conf = thr.conf)
   class(result) <- "ssenet"
@@ -159,13 +178,13 @@ imputeLabels = function(x, y, alpha, lambda, lambda_nfolds, family, max.iter, pe
       weights <- as.numeric((1/table(ynew[labeled]))[as.character(ynew[labeled])])
     }
 
-    assertthat::assert_that(any(table(ynew[labeled]) > 3), msg = "3 obs must be present for a given cell-type")
+    assertthat::assert_that(any(table(ynew[labeled]) > 3), msg = "3 obs must be present for a given class")
 
     # Train classifier
     if(family == "binomial"){
-      model <- glmnet::glmnet(x[labeled, ], ynew[labeled], family = family, alpha = alpha, weights = weights)
-      cvob1 = glmnet::cv.glmnet(x[labeled, ], ynew[labeled], family = family)
+      model <- glmnet::glmnet(x[labeled, ], ynew[labeled], family = family, alpha = alpha, weights = weights[labeled])
       if (is.null(lambda)) {
+        cvob1 = glmnet::cv.glmnet(x[labeled, ], ynew[labeled], family = family, weights = weights[labeled])
         lambda = cvob1$lambda.min
       } else {
         lambda = lambda
@@ -174,15 +193,29 @@ imputeLabels = function(x, y, alpha, lambda, lambda_nfolds, family, max.iter, pe
       prob <- checkProb(prob = glmnet::predict.lognet(model, x[unlabeled, ], s = lambda, type = "response")[,,1], ninstances = length(unlabeled), classes)
     }
     if(family == "multinomial"){
-      model <- glmnet::glmnet(x[labeled, ], ynew[labeled], family=family, alpha = alpha, type.multinomial = "grouped", weights = weights)
-      cvob1 = glmnet::cv.glmnet(x[labeled, ], ynew[labeled], family=family)
+      model <- glmnet::glmnet(x[labeled, ],
+                              ynew[labeled],
+                              family=family,
+                              alpha = alpha,
+                              type.multinomial = "grouped",
+                              weights = weights)
       if (is.null(lambda)) {
+        cvob1 = glmnet::cv.glmnet(x[labeled, ],
+                                  ynew[labeled],
+                                  family=family,
+                                  type.multinomial = "grouped",
+                                  weights = weights)
         lambda = cvob1$lambda.min
       } else {
         lambda = lambda
       }
       # Predict probabilities per classes of unlabeled examples
-      prob <- checkProb(prob = glmnet::predict.multnet(model, x[unlabeled, ], s = lambda, type = "response", type.multinomial = "grouped")[,,1], ninstances = length(unlabeled), classes)
+      prob <- checkProb(prob = glmnet::predict.multnet(model, x[unlabeled, ],
+                                                       s = lambda,
+                                                       type = "response",
+                                                       type.multinomial = "grouped")[,,1],
+                        ninstances = length(unlabeled),
+                        classes)
     }
 
     # Select the instances with better class probability
@@ -216,10 +249,31 @@ imputeLabels = function(x, y, alpha, lambda, lambda_nfolds, family, max.iter, pe
 
   if(family == "binomial"){
     model <- glmnet::glmnet(x[labeled, ], ynew[labeled], family=family, alpha = alpha, weights = weights)
+    if (is.null(lambda)) {
+      cvob1 = glmnet::cv.glmnet(x[labeled, ], ynew[labeled], family = family, weights = weights)
+      lambda = cvob1$lambda.min
+    } else {
+      lambda = lambda
+    }
     pred <- predict(model, x, s = lambda, type = "class")
   }
   if(family == "multinomial"){
-    model <- glmnet::glmnet(x[labeled, ], ynew[labeled], family=family, alpha = alpha, type.multinomial = "grouped", weights = weights)
+    model <- glmnet::glmnet(x[labeled, ],
+                            ynew[labeled],
+                            family=family,
+                            alpha = alpha,
+                            type.multinomial = "grouped",
+                            weights = weights)
+    if (is.null(lambda)) {
+      cvob1 = glmnet::cv.glmnet(x[labeled, ],
+                                ynew[labeled],
+                                family=family,
+                                type.multinomial = "grouped",
+                                weights = weights)
+      lambda = cvob1$lambda.min
+    } else {
+      lambda = lambda
+    }
     pred <- glmnet::predict.multnet(model, x, s = lambda, type = "class", type.multinomial = "grouped")
   }
   #final weights

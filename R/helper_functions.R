@@ -158,3 +158,23 @@ extractFeatures = function(fit, lambda, family){
   enet.panel.length <- length(enet.panel)
   return(list(Active.Coefficients=Active.Coefficients, enet.panel=enet.panel))
 }
+
+#' @export
+estimate_error <- function(truth, pred) {
+  mat <- table(factor(as.character(pred), levels = levels(truth)), truth)
+  mat2 <- mat
+  diag(mat2) <- 0
+  classError <- colSums(mat2)/colSums(mat)
+  er <- sum(mat2)/sum(mat)
+  ber <- mean(classError)
+  perfTest <- c(classError, er, ber)
+  names(perfTest) <- c(names(classError), "ER", "BER")
+  perfTest
+}
+
+#' @export
+set_na <- function(y, perc_na){
+  unlist(lapply(levels(y), function(i){
+    na_index <- sample(x = which(y == i), size = ceiling(length(which(y == i)) * perc_na))
+  }))
+}

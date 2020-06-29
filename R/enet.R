@@ -14,12 +14,12 @@
 #' @param weights - observational weights; default to 1
 #' @export
 enet = function (xtrain, ytrain, alpha, lambda = NULL, lambda_nfolds=3, family, xtest = NULL,
-  ytest = NULL, filter = "p.value", topranked = 50, keepVar = NULL, weights = NULL) {
+  ytest = NULL, filter = "none", topranked = 50, keepVar = NULL, weights = NULL) {
 
   # Check format of data input
-  assertthat::assert_that(class(xtrain) == "matrix", msg = "xtrain must be a matrix!")
+  assertthat::assert_that(class(xtrain)[1] == "matrix", msg = "xtrain must be a matrix!")
   assertthat::assert_that(ifelse(is.null(xtest), TRUE, class(xtest) == "matrix"), msg = "xtest must be a matrix!")
-  assertthat::assert_that(class(ytrain) == "factor", msg = "ytrain must be a factor!")
+  assertthat::assert_that(class(ytrain)[1] == "factor", msg = "ytrain must be a factor!")
   assertthat::assert_that(ifelse(is.null(ytest), TRUE, class(ytest) == "factor"), msg = "ytest must be a factor!")
 
   # Check that the number of samples in the minority classes has more than lambda_nfolds
@@ -67,7 +67,7 @@ enet = function (xtrain, ytrain, alpha, lambda = NULL, lambda_nfolds=3, family, 
   fit <- do.call(glmnet::glmnet, c(glmnet_default_params, args_glmnet))
   cv.fit <- do.call(glmnet::cv.glmnet, c(cvglmnet_default_params, args_cvglmnet))
   lambda <- ifelse(is.null(lambda), cv.fit$lambda.1se, lambda)
-  features <- extractFeatures(fit, lambda, family)
+  features <- ssenet::extractFeatures(fit, lambda, family)
 
 
   # Apply model to test data if provided
