@@ -6,7 +6,7 @@ date: "`r format(Sys.time(), '%d %B, %Y')`"
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, cache = TRUE, warning = FALSE, message = FALSE)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 
 library(magrittr); 
 library(knitr);
@@ -72,7 +72,7 @@ points(coord, col = mixOmics::color.mixo(as.numeric(qnmLabels$seqfish$V3)), pch 
 # set constants
 M = 2; iter = 2;
 ncores = iter;
-alpha = 1;
+alpha = 0;
 lambda = NULL;
 lambda_nfolds = 3;
 family = "multinomial";

@@ -5,3 +5,4 @@
 README.html
 README_cache
 .DS_Store
+inst/extdata/GSE71585_RefSeq_counts.csv

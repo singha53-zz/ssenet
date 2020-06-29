@@ -75,7 +75,7 @@ Questions for the BIRSBiointegration workshop:
 # set constants
 M = 2; iter = 2;
 ncores = iter;
-alpha = 1;
+alpha = 0;
 lambda = NULL;
 lambda_nfolds = 3;
 family = "multinomial";
